@@ -1,0 +1,59 @@
+
+#include <Wire.h>
+#include "SparkFun_BMA400_Arduino_Library.h"
+BMA400 bma;
+#define BUZZER_PIN 8
+#define LED_PIN    9
+float prevX = 0, prevY = 0, prevZ = 0;
+// Sensitivity threshold
+float threshold = 0.05;   // adjust lower = more sensitive
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("Low Power Monument Tracker Starting...");
+  // Start sensor
+  if (bma.beginI2C() != BMA400_OK) {
+    if (bma.beginI2C(0x15) != BMA400_OK) {
+      Serial.println("BMA400 NOT detected!");
+      while (1);
+    }
+  }
+  // Initial reading
+  bma.getSensorData();
+  prevX = bma.data.accelX;
+  prevY = bma.data.accelY;
+  prevZ = bma.data.accelZ;
+  Serial.println("System Armed (Low Power Mode)");
+}
+void loop() {
+  // Read only occasionally to save power
+  bma.getSensorData();
+  float x = bma.data.accelX;
+  float y = bma.data.accelY;
+  float z = bma.data.accelZ;
+  float diff = abs(x - prevX) + abs(y - prevY) + abs(z - prevZ);
+  Serial.print("Diff = ");
+  Serial.println(diff, 4);
+  // Wake / Alert only if disturbance occurs
+  if (diff > threshold) {
+    Serial.println("⚠ Disturbance Detected!");
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(BUZZER_PIN, HIGH);
+      digitalWrite(LED_PIN, HIGH);
+      delay(150);
+      digitalWrite(BUZZER_PIN, LOW);
+      digitalWrite(LED_PIN, LOW);
+      delay(150);
+    }
+    // refresh baseline after movement
+    prevX = x;
+    prevY = y;
+    prevZ = z;
+  }
+  // Sleep style polling delay (low power)
+  delay(1000);   // checks once every second
+}
